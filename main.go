@@ -7,25 +7,12 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/joho/godotenv"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/llms/ollama"
 )
-
-// LLMService interface for service-agnostic LLM interactions
-type LLMService interface {
-	GenerateCommitMessage(diff string) (string, string, error)
-}
-
-// OllamaService implements LLMService using Ollama
-type OllamaService struct {
-	ModelName string
-}
 
 func GenerateCommitMessage(diff string) (string, string, error) {
 	config := openai.DefaultAzureConfig(os.Getenv("azure_openai_key"), os.Getenv("azure_openai_url"))
@@ -66,11 +53,6 @@ func GenerateCommitMessage(diff string) (string, string, error) {
 		},
 		ResponseFormat: &openai.ChatCompletionResponseFormat{
 			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
-			// JSONSchema: &openai.ChatCompletionResponseFormatJSONSchema{
-			// Name:   "git_commit_message",
-			// Schema: schema,
-			// Strict: true,
-			// },
 		},
 	})
 
@@ -88,53 +70,11 @@ func GenerateCommitMessage(diff string) (string, string, error) {
 	return commitMessage.Headline, commitMessage.Description, nil
 }
 
-func (o *OllamaService) GenerateCommitMessage(diff string) (string, string, error) {
-	prompt := fmt.Sprintf("Given the following git diff, generate a concise commit message. Provide a short concise headline within 50 characters, and a brief description, all text should be plain text and no text that not part of the headline or description is wanted, headline and description should be seperated by two blank lines:\n\n%s", diff)
-	llm, err := ollama.New(ollama.WithModel("gemma:2b"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	ctx := context.Background()
-	completion, err := llms.GenerateFromSinglePrompt(
-		ctx,
-		llm,
-		prompt,
-		llms.WithTemperature(0.8),
-		llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
-			fmt.Print(string(chunk))
-			return nil
-		}),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// fmt.Println(completion)
-	_ = completion
-	// cmd := exec.Command("ollama", "run", o.ModelName, prompt)
-	// output, err := cmd.CombinedOutput()
-	// if err != nil {
-	// 	return "", "", fmt.Errorf("error running Ollama: %w", err)
-	// }
-
-	// response := string(completion)
-	// fmt.Println(response)
-	parts := strings.SplitN(completion, "\n\n", 2)
-
-	if len(parts) < 2 {
-		return strings.TrimSpace(completion), "", nil
-	}
-
-	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]), nil
-}
-
 func main() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	// Create an instance of OllamaService
-	// llm := &OllamaService{ModelName: "gemma:2b"}
-
 	// Get the git diff
 	diff, err := getGitDiff()
 	if err != nil {
@@ -144,7 +84,6 @@ func main() {
 	fmt.Println(diff)
 
 	// Generate commit message
-	// headline, description, err := llm.GenerateCommitMessage(diff)
 	headline, description, err := GenerateCommitMessage(diff)
 	if err != nil {
 		fmt.Printf("Error generating commit message: %v\n", err)
@@ -153,11 +92,6 @@ func main() {
 
 	// Print the result
 	fmt.Printf("Commit Headline: %s\n\nDescription:\n%s\n", headline, description)
-
-	// headline, description, err := llm.GenerateCommitMessage(diff)
-	// if err != nil {
-	// log.Fatalf("Error generating commit message: %v", err)
-	// }
 
 	// Create a form using charmbracelet/huh
 	var useCommit bool
