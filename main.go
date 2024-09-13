@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/charmbracelet/huh"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/tmc/langchaingo/llms"
@@ -29,12 +31,12 @@ func GenerateCommitMessage(diff string) (string, string, error) {
 	client := openai.NewClientWithConfig(config)
 	ctx := context.Background()
 
-	type Result struct {
-		Explanation string `json:"headline"`
-		Output      string `json:"description"`
+	type CommitMessage struct {
+		Headline    string `json:"headline"`
+		Description string `json:"description"`
 	}
 
-	var result Result
+	var result CommitMessage
 	schema, err := jsonschema.GenerateSchemaForType(result)
 	if err != nil {
 		fmt.Printf("Error generating schema: %v\n", err)
@@ -76,8 +78,13 @@ func GenerateCommitMessage(diff string) (string, string, error) {
 		return "", "", err
 	}
 
-	fmt.Println(resp.Choices[0].Message.Content)
-	return resp.Choices[0].Message.Content, "", nil
+	var commitMessage CommitMessage
+	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &commitMessage)
+	if err != nil {
+		return "", "", fmt.Errorf("error unmarshalling response: %w", err)
+	}
+
+	return commitMessage.Headline, commitMessage.Description, nil
 }
 
 func (o *OllamaService) GenerateCommitMessage(diff string) (string, string, error) {
@@ -141,6 +148,39 @@ func main() {
 
 	// Print the result
 	fmt.Printf("Commit Headline: %s\n\nDescription:\n%s\n", headline, description)
+
+	// headline, description, err := llm.GenerateCommitMessage(diff)
+	// if err != nil {
+	// log.Fatalf("Error generating commit message: %v", err)
+	// }
+
+	// Create a form using charmbracelet/huh
+	var useCommit bool
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewNote().
+				Title("Generated Commit Message").
+				Description(fmt.Sprintf("Headline: %s\n\nDescription: %s", headline, description)),
+			huh.NewConfirm().
+				Title("Do you want to use this commit message?").
+				Value(&useCommit),
+		),
+	)
+
+	err = form.Run()
+	if err != nil {
+		log.Fatalf("Error running form: %v", err)
+	}
+
+	if useCommit {
+		err = createCommit(headline, description)
+		if err != nil {
+			log.Fatalf("Error creating commit: %v", err)
+		}
+		fmt.Println("Commit created successfully!")
+	} else {
+		fmt.Println("Commit message not used.")
+	}
 }
 
 func getGitDiff() (string, error) {
@@ -150,4 +190,14 @@ func getGitDiff() (string, error) {
 		return "", fmt.Errorf("error getting git diff: %w", err)
 	}
 	return string(output), nil
+}
+
+func createCommit(headline, description string) error {
+	message := fmt.Sprintf("%s\n\n%s", headline, description)
+	cmd := exec.Command("git", "commit", "-m", message)
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error creating commit: %w", err)
+	}
+	return nil
 }
