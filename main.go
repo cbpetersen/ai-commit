@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
+	"github.com/joho/godotenv"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/tmc/langchaingo/llms"
@@ -56,7 +57,7 @@ func GenerateCommitMessage(diff string) (string, string, error) {
 			},
 			{
 				Role:    openai.ChatMessageRoleSystem,
-				Content: "Output muSt be in the form of a JSON object with a headline and description field according to schema: " + string(jsonSchema),
+				Content: "Output must be in the form of a JSON object with a headline and description field according to schema: " + string(jsonSchema),
 			},
 			{
 				Role:    openai.ChatMessageRoleUser,
@@ -127,6 +128,10 @@ func (o *OllamaService) GenerateCommitMessage(diff string) (string, string, erro
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 	// Create an instance of OllamaService
 	// llm := &OllamaService{ModelName: "gemma:2b"}
 
