@@ -1,4 +1,4 @@
-# Maintainer: Christoffer Petersen
+# Maintainer: Christoffer Petersen <tools@cb-p.dk>
 pkgname=ai-commit
 pkgver=0.1.0
 pkgrel=1
