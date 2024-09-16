@@ -187,15 +187,19 @@ func main() {
 	}
 
 	// Create a form using charmbracelet/huh
-	var useCommit bool
+	var useCommit string
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewNote().
 				Title("Generated Commit Message").
 				Description(fmt.Sprintf("Headline: %s\n\nDescription: %s", headline, description)),
-			huh.NewConfirm().
+			huh.NewSelect[string]().
 				Title("Do you want to use this commit message?").
-				Value(&useCommit),
+				Options(
+					huh.NewOption("Use commit", UseCommit),
+					huh.NewOption("edit commit", EditCommit),
+					huh.NewOption("Do not commit", DontUseCommit),
+				).Value(&useCommit),
 		),
 	)
 
@@ -204,16 +208,21 @@ func main() {
 		log.Fatalf("Error running form: %v", err)
 	}
 
-	if useCommit {
+	switch useCommit {
+	case UseCommit:
 		err = createCommit(headline, description)
-		if err != nil {
-			log.Fatalf("Error creating commit: %v", err)
-		}
-		fmt.Println("Commit created successfully!")
-	} else {
+	case EditCommit:
+		err = editCommit(headline, description)
+	case DontUseCommit:
 		fmt.Println("Commit message not used.")
 	}
 }
+
+const (
+	UseCommit     = "use"
+	EditCommit    = "edit"
+	DontUseCommit = "dont-use"
+)
 
 func getGitDiff() (string, error) {
 	cmd := exec.Command("git", "diff", "--cached")
@@ -222,6 +231,38 @@ func getGitDiff() (string, error) {
 		return "", fmt.Errorf("error getting git diff: %w", err)
 	}
 	return string(output), nil
+}
+
+func editCommit(headline, description string) error {
+	message := fmt.Sprintf("%s\n\n%s", headline, description)
+	tempFile, err := os.CreateTemp("", "tempfile-*.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(tempFile.Name())
+	tempFile.WriteString(message)
+	output, err := exec.Command("git", "config", "core.editor").Output()
+	if err != nil {
+		return fmt.Errorf("error getting git editor: %w", err)
+	}
+	cmd := exec.Command(strings.TrimSpace(string(output)), tempFile.Name())
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Committing...")
+
+	cmd = exec.Command("git", "commit", "-F", tempFile.Name())
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Fatal(err)
+	}
+	return nil
 }
 
 func createCommit(headline, description string) error {
