@@ -237,7 +237,7 @@ func editCommit(headline, description string) error {
 	message := fmt.Sprintf("%s\n\n%s", headline, description)
 	tempFile, err := os.CreateTemp("", "tempfile-*.txt")
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("error creating temp file: %w", err)
 	}
 	defer os.Remove(tempFile.Name())
 	tempFile.WriteString(message)
@@ -251,16 +251,14 @@ func editCommit(headline, description string) error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("error running editor: %w", err)
 	}
-	fmt.Println("Committing...")
-
 	cmd = exec.Command("git", "commit", "-F", tempFile.Name())
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("error creating commit: %w", err)
 	}
 	return nil
 }
@@ -268,6 +266,9 @@ func editCommit(headline, description string) error {
 func createCommit(headline, description string) error {
 	message := fmt.Sprintf("%s\n\n%s", headline, description)
 	cmd := exec.Command("git", "commit", "-m", message)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("error creating commit: %w", err)
