@@ -3,16 +3,19 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/charmbracelet/huh"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
+	"github.com/urfave/cli/v2"
 )
 
 type openAI struct {
@@ -84,38 +87,45 @@ type Config struct {
 }
 
 func main() {
+	var showConfig int
+	app := &cli.App{
+		Flags: []cli.Flag{
+			&cli.BoolFlag{Name: "config", Count: &showConfig, Usage: "Update the current configuration"},
+		},
+		EnableBashCompletion: true,
+		HideHelp:             false,
+		HideVersion:          false,
+		CommandNotFound: func(cCtx *cli.Context, command string) {
+			fmt.Fprintf(cCtx.App.Writer, "Thar be no %q here.\n", command)
+		},
+		Action: func(c *cli.Context) error {
+			return nil
+		},
+	}
+	if err := app.Run(os.Args); err != nil {
+		panic(err)
+	}
+
 	homeDir, err := os.UserHomeDir()
-	// err != nil {
 
-	// configPath := homeDir + "/.config/myapp/config.toml"
-
-	// Create the directories if they don't exist
-	// err = os.MkdirAll(homeDir + "/.config/myapp", os.ModePerm)
-	// if err != nil && !os.IsExist(err) {
-	// Handle error
-	// }
-
-	// Open the file for writing, overwriting if it exists
-	// f, err := os.OpenFile(configPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		// Handle error
 		fmt.Println("Failed to get home directory:", err)
 		return
 	}
-	// defer f.Close()
 	configPath := filepath.Join(homeDir, ".config", "ai-commit", "ai-commit.toml")
 	config := Config{}
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, err := os.Stat(configPath); os.IsNotExist(err) || showConfig > 0 {
 		configForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
 					Title("What’s your Azure Key?").
 					Value(&config.Azure.Key).
+					EchoMode(huh.EchoModePassword).
 					// Validating fields is easy. The form will mark erroneous fields
 					// and display error messages accordingly.
 					Validate(func(str string) error {
-						if str == "Frank" {
-							// return errors.New("Sorry, we don’t serve customers named Frank.")
+						if str == "" {
+							return errors.New("Sorry, this cannot be empty")
 						}
 						return nil
 					}),
@@ -125,20 +135,11 @@ func main() {
 					// Validating fields is easy. The form will mark erroneous fields
 					// and display error messages accordingly.
 					Validate(func(str string) error {
-						if str == "Frank" {
-							// return errors.New("Sorry, we don’t serve customers named Frank.")
+						if str == "" {
+							return errors.New("Sorry, this cannot be empty")
 						}
 						return nil
 					}),
-
-				// huh.NewText().
-				// Title("Special Instructions").
-				// CharLimit(400).
-				// Value(&instructions),
-
-				// huh.NewConfirm().
-				// Title("Would you like 15% off?").
-				// Value(&discount),
 			),
 		)
 		configForm.Run()
@@ -146,10 +147,6 @@ func main() {
 			fmt.Println("Failed to create config directory:", err)
 			return
 		}
-		// f, err := os.Create(configPath)
-		// if err != nil {
-		// 	panic(err)
-		// }
 		// Save the config as a TOML file
 		f, err := os.Create(configPath)
 		if err != nil {
@@ -163,7 +160,6 @@ func main() {
 			return
 		}
 	} else {
-
 		if _, err := toml.DecodeFile(configPath, &config); err != nil {
 			fmt.Println("Failed to load config:", err)
 			return
@@ -177,6 +173,10 @@ func main() {
 		return
 	}
 
+	if strings.TrimSpace(diff) == "" {
+		fmt.Println("No changes to commit.")
+		return
+	}
 	ai := openAI{Key: config.Azure.Key, URL: config.Azure.URL}
 
 	// Generate commit message
@@ -185,9 +185,6 @@ func main() {
 		fmt.Printf("Error generating commit message: %v\n", err)
 		return
 	}
-
-	// Print the result
-	// fmt.Printf("Commit Headline: %s\n\nDescription:\n%s\n", headline, description)
 
 	// Create a form using charmbracelet/huh
 	var useCommit bool
