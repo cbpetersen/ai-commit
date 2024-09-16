@@ -87,10 +87,12 @@ type Config struct {
 }
 
 func main() {
+	version := "0.1.0"
 	var showConfig int
 	app := &cli.App{
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "config", Count: &showConfig, Usage: "Update the current configuration"},
+			&cli.BoolFlag{Name: "version", Aliases: []string{"v"}, Usage: "Print the version"},
 		},
 		EnableBashCompletion: true,
 		HideHelp:             false,
@@ -98,7 +100,10 @@ func main() {
 		CommandNotFound: func(cCtx *cli.Context, command string) {
 			fmt.Fprintf(cCtx.App.Writer, "Thar be no %q here.\n", command)
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx *cli.Context) error {
+			if ctx.Bool("version") {
+				return cli.Exit(fmt.Sprintf("Version: %s", version), 0)
+			}
 			return nil
 		},
 	}

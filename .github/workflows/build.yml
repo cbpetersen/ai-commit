@@ -27,14 +27,15 @@ jobs:
     - name: Build the project
       run: |
         cd $GITHUB_WORKSPACE
-        makepkg -si --noconfirm
+        go build -o ai-commit
+        # makepkg -si --noconfirm
 
     - name: Verify the build
       run: |
-        ./Ai-commit --version
+        ./ai-commit --version
 
-    - name: Upload package
-      uses: actions/upload-artifact@v3
-      with:
-        name: ai-commit
-        path: "*.pkg.tar.zst"
+    # - name: Upload package
+    #   uses: actions/upload-artifact@v3
+    #   with:
+    #     name: ai-commit
+    #     path: "*.pkg.tar.zst"
