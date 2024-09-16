@@ -3,6 +3,7 @@ module cbpetersen/git-commit-ai
 go 1.23.0
 
 require (
+	github.com/BurntSushi/toml v1.4.0
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/catppuccin/go v0.2.0 // indirect

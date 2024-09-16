@@ -7,15 +7,21 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 
+	"github.com/BurntSushi/toml"
 	"github.com/charmbracelet/huh"
-	"github.com/joho/godotenv"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-func GenerateCommitMessage(diff string) (string, string, error) {
-	config := openai.DefaultAzureConfig(os.Getenv("azure_openai_key"), os.Getenv("azure_openai_url"))
+type openAI struct {
+	Key string
+	URL string
+}
+
+func (ai *openAI) GenerateCommitMessage(diff string) (string, string, error) {
+	config := openai.DefaultAzureConfig(ai.Key, ai.URL)
 	client := openai.NewClientWithConfig(config)
 	ctx := context.Background()
 
@@ -70,28 +76,118 @@ func GenerateCommitMessage(diff string) (string, string, error) {
 	return commitMessage.Headline, commitMessage.Description, nil
 }
 
+type Config struct {
+	Azure struct {
+		Key string `toml:"key"`
+		URL string `toml:"url"`
+	} `toml:"settings"`
+}
+
 func main() {
-	err := godotenv.Load()
+	homeDir, err := os.UserHomeDir()
+	// err != nil {
+
+	// configPath := homeDir + "/.config/myapp/config.toml"
+
+	// Create the directories if they don't exist
+	// err = os.MkdirAll(homeDir + "/.config/myapp", os.ModePerm)
+	// if err != nil && !os.IsExist(err) {
+	// Handle error
+	// }
+
+	// Open the file for writing, overwriting if it exists
+	// f, err := os.OpenFile(configPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		// Handle error
+		fmt.Println("Failed to get home directory:", err)
+		return
 	}
+	// defer f.Close()
+	configPath := filepath.Join(homeDir, ".config", "ai-commit", "ai-commit.toml")
+	config := Config{}
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		configForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("What’s your Azure Key?").
+					Value(&config.Azure.Key).
+					// Validating fields is easy. The form will mark erroneous fields
+					// and display error messages accordingly.
+					Validate(func(str string) error {
+						if str == "Frank" {
+							// return errors.New("Sorry, we don’t serve customers named Frank.")
+						}
+						return nil
+					}),
+				huh.NewInput().
+					Title("What’s your Azure URL?").
+					Value(&config.Azure.URL).
+					// Validating fields is easy. The form will mark erroneous fields
+					// and display error messages accordingly.
+					Validate(func(str string) error {
+						if str == "Frank" {
+							// return errors.New("Sorry, we don’t serve customers named Frank.")
+						}
+						return nil
+					}),
+
+				// huh.NewText().
+				// Title("Special Instructions").
+				// CharLimit(400).
+				// Value(&instructions),
+
+				// huh.NewConfirm().
+				// Title("Would you like 15% off?").
+				// Value(&discount),
+			),
+		)
+		configForm.Run()
+		if err = os.MkdirAll(filepath.Dir(configPath), os.ModePerm); err != nil {
+			fmt.Println("Failed to create config directory:", err)
+			return
+		}
+		// f, err := os.Create(configPath)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// Save the config as a TOML file
+		f, err := os.Create(configPath)
+		if err != nil {
+			fmt.Println("Failed to create config file:", err)
+			return
+		}
+		defer f.Close()
+
+		if err := toml.NewEncoder(f).Encode(config); err != nil {
+			fmt.Println("Failed to encode config:", err)
+			return
+		}
+	} else {
+
+		if _, err := toml.DecodeFile(configPath, &config); err != nil {
+			fmt.Println("Failed to load config:", err)
+			return
+		}
+	}
+
 	// Get the git diff
 	diff, err := getGitDiff()
 	if err != nil {
 		fmt.Printf("Error getting git diff: %v\n", err)
 		return
 	}
-	fmt.Println(diff)
+
+	ai := openAI{Key: config.Azure.Key, URL: config.Azure.URL}
 
 	// Generate commit message
-	headline, description, err := GenerateCommitMessage(diff)
+	headline, description, err := ai.GenerateCommitMessage(diff)
 	if err != nil {
 		fmt.Printf("Error generating commit message: %v\n", err)
 		return
 	}
 
 	// Print the result
-	fmt.Printf("Commit Headline: %s\n\nDescription:\n%s\n", headline, description)
+	// fmt.Printf("Commit Headline: %s\n\nDescription:\n%s\n", headline, description)
 
 	// Create a form using charmbracelet/huh
 	var useCommit bool
