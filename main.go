@@ -28,9 +28,20 @@ func (ai *openAI) GenerateCommitMessage(diff string) (string, string, error) {
 	client := openai.NewClientWithConfig(config)
 	ctx := context.Background()
 
+	type Dependency struct {
+		Version string `json:"version"`
+		Name    string `json:"name"`
+	}
+
 	type CommitMessage struct {
-		Headline    string `json:"headline"`
-		Description string `json:"description"`
+		Headline     string `json:"headline"`
+		Description  string `json:"description"`
+		Dependencies struct {
+			Added      []Dependency `json:"added"`
+			Upgraded   []Dependency `json:"upgraded"`
+			Downgraded []Dependency `json:"downgraded"`
+			Removed    []Dependency `json:"removed"`
+		} `json:"dependencies"`
 	}
 
 	var result CommitMessage
@@ -53,7 +64,15 @@ func (ai *openAI) GenerateCommitMessage(diff string) (string, string, error) {
 			},
 			{
 				Role:    openai.ChatMessageRoleSystem,
-				Content: "Output must be in the form of a JSON object with a headline and description field according to schema: " + string(jsonSchema),
+				Content: "Headline should only mention the core area of the diff",
+			},
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: "Changes to dependencies should not be mentioned directly but should be in the structured output",
+			},
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: "Output must be in the form of a JSON object with a dependencies, headline and description field according to schema: " + string(jsonSchema),
 			},
 			{
 				Role:    openai.ChatMessageRoleUser,
@@ -75,8 +94,31 @@ func (ai *openAI) GenerateCommitMessage(diff string) (string, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("error unmarshalling response: %w", err)
 	}
+	addDependencies := func(dependencyStr, typeOfDependency string, deps []Dependency) string {
+		if len(deps) == 0 {
+			return dependencyStr
+		}
+		d := fmt.Sprintf("- %s:\n", typeOfDependency)
+		for _, dep := range deps {
+			d += fmt.Sprintf("  - %s (%s)\n", dep.Name, dep.Version)
+		}
 
-	return commitMessage.Headline, commitMessage.Description, nil
+		return fmt.Sprintf("%s\n%s", dependencyStr, d)
+	}
+
+	dependencies := ""
+	dependencies = addDependencies(dependencies, "Added", commitMessage.Dependencies.Added)
+	dependencies = addDependencies(dependencies, "Upgraded", commitMessage.Dependencies.Upgraded)
+	dependencies = addDependencies(dependencies, "Downgraded", commitMessage.Dependencies.Downgraded)
+	dependencies = addDependencies(dependencies, "Removed", commitMessage.Dependencies.Removed)
+
+	description := commitMessage.Description
+
+	if len(dependencies) > 0 {
+		description = fmt.Sprintf("%s\n\nDependency changes:%s", description, dependencies)
+	}
+
+	return commitMessage.Headline, description, nil
 }
 
 type Config struct {
@@ -126,8 +168,6 @@ func main() {
 					Title("What’s your Azure Key?").
 					Value(&config.Azure.Key).
 					EchoMode(huh.EchoModePassword).
-					// Validating fields is easy. The form will mark erroneous fields
-					// and display error messages accordingly.
 					Validate(func(str string) error {
 						if str == "" {
 							return errors.New("Sorry, this cannot be empty")
@@ -137,8 +177,6 @@ func main() {
 				huh.NewInput().
 					Title("What’s your Azure URL?").
 					Value(&config.Azure.URL).
-					// Validating fields is easy. The form will mark erroneous fields
-					// and display error messages accordingly.
 					Validate(func(str string) error {
 						if str == "" {
 							return errors.New("Sorry, this cannot be empty")
