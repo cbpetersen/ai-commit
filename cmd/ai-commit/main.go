@@ -48,7 +48,33 @@ func main() {
 	}
 
 	// Get the git diff
-	diff, err := git.GetGitDiff()
+
+	ai := ai.OpenAI{Key: config.Azure.Key, URL: config.Azure.URL}
+
+	if doPatches > 0 {
+		diff, err := git.GetGitDiff()
+		if err != nil {
+			log.Errorf("Error getting git diff: %v\n", err)
+			return
+		}
+		patches, err := ai.CreatePatchFromDiff(context.Background(), diff)
+		if err != nil {
+			log.Errorf("Error generating patches: %v\n", err)
+			return
+		}
+		for _, patch := range patches {
+			fmt.Printf("Patch: %s\n", patch.Patch)
+			fmt.Printf("Commit Message: %s\n", patch.CommitMessage)
+			if err := git.CreateCommitFromPatch(patch); err != nil {
+				log.Fatalf("Error applying patch: %v\n", err)
+			}
+			if err := git.Commit(patch.CommitMessage); err != nil {
+				log.Fatalf("Error committing patch: %v\n", err)
+			}
+		}
+		return
+	}
+	diff, err := git.GetGitDiffCached()
 	if err != nil {
 		log.Errorf("Error getting git diff: %v\n", err)
 		return

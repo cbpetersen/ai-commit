@@ -5,6 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/cbpetersen/ai-commit/internal/ai"
+	"github.com/charmbracelet/log"
 )
 
 const (
@@ -56,6 +59,41 @@ func EditCommitMessage(headline, description string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error creating commit: %w", err)
+	}
+	return nil
+}
+
+func CreateCommitFromPatch(msg ai.Patch) error {
+	f, err := os.Create("patch.diff")
+	defer f.Close()
+	// defer os.Remove("patch.diff")
+	if err != nil {
+		return fmt.Errorf("error creating patch file: %w", err)
+	}
+	log.Debug("patch file created")
+	log.Debug(msg.Patch)
+	if _, err := f.WriteString(msg.Patch); err != nil {
+		return fmt.Errorf("error writing patch file: %w", err)
+	}
+	cmd := exec.Command("git", "apply", "--verbose", "patch.diff")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return fmt.Errorf("error applying patch: %w\n%s", err, output)
+	}
+	log.Infof("patch applied:\n%s", output)
+
+	return nil
+}
+
+func Commit(msg string) error {
+	cmd := exec.Command("git", "commit", "-m", msg)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
 		return fmt.Errorf("error creating commit: %w", err)
 	}
 	return nil

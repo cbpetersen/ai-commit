@@ -54,7 +54,8 @@ func (ai *OpenAI) CreatePatchFromDiff(ctx context.Context, diff string) ([]Patch
 			{
 				Role: openai.ChatMessageRoleSystem,
 				Content: `
-				git patches shoud be in a format that can be used with git apply 
+				git patches shoud be in a format that can be used with git apply.
+				if it makes sense to split the diff into multiple patches please do so.
 				`,
 			},
 			{
