@@ -1,5 +1,5 @@
 .env
-ai-commit
 ai-commit-*
+ai-commit/*
 src/
 pkg/

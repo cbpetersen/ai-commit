@@ -27,7 +27,7 @@ jobs:
     - name: Build the project
       run: |
         cd $GITHUB_WORKSPACE
-        go build -o ai-commit
+        go build -o ai-commit ./cmd/ai-commit
         # makepkg -si --noconfirm
 
     - name: Verify the build

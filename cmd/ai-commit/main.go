@@ -43,8 +43,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("Azure Key: %s", config.Azure.Key)
-	log.Infof("Azure URL: %s", config.Azure.URL)
 
 	// Get the git diff
 	diff, err := git.GetGitDiff()
