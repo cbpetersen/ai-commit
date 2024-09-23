@@ -14,10 +14,9 @@ type OpenAI struct {
 	URL string
 }
 
-func (ai *OpenAI) GenerateCommitMessage(diff string) (string, string, error) {
+func (ai *OpenAI) GenerateCommitMessage(ctx context.Context, diff string) (string, string, error) {
 	config := openai.DefaultAzureConfig(ai.Key, ai.URL)
 	client := openai.NewClientWithConfig(config)
-	ctx := context.Background()
 
 	type Dependency struct {
 		Version string `json:"version"`

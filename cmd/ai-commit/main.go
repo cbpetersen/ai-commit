@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cbpetersen/ai-commit/internal"
 	"github.com/cbpetersen/ai-commit/internal/ai"
 	"github.com/cbpetersen/ai-commit/internal/git"
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/log"
 	"github.com/urfave/cli/v2"
 )
@@ -26,7 +29,7 @@ func main() {
 		HideHelp:             false,
 		HideVersion:          false,
 		CommandNotFound: func(cCtx *cli.Context, command string) {
-			fmt.Fprintf(cCtx.App.Writer, "Thar be no %q here.\n", command)
+			fmt.Fprintf(cCtx.App.Writer, "No Options with %q here.\n", command)
 		},
 		Action: func(ctx *cli.Context) error {
 			if ctx.Bool("version") {
@@ -47,23 +50,28 @@ func main() {
 	// Get the git diff
 	diff, err := git.GetGitDiff()
 	if err != nil {
-		fmt.Printf("Error getting git diff: %v\n", err)
+		log.Errorf("Error getting git diff: %v\n", err)
 		return
 	}
 
 	if strings.TrimSpace(diff) == "" {
-		fmt.Println("No changes to commit.")
+		log.Error("No changes to commit.")
 		return
 	}
 	ai := ai.OpenAI{Key: config.Azure.Key, URL: config.Azure.URL}
 
 	// Generate commit message
-	headline, description, err := ai.GenerateCommitMessage(diff)
+	var headline, description string
+	err = spinner.New().Action(func() {
+		ctx, cancelled := context.WithTimeout(context.Background(), time.Second*30)
+		headline, description, err = ai.GenerateCommitMessage(ctx, diff)
+		cancelled()
+	}).Title("Generating commit message...").Run()
+
 	if err != nil {
-		fmt.Printf("Error generating commit message: %v\n", err)
+		log.Errorf("Error generating commit message: %v\n", err)
 		return
 	}
-
 	// Create a form using charmbracelet/huh
 	var useCommit string
 	form := huh.NewForm(
@@ -92,6 +100,6 @@ func main() {
 	case git.EditCommit:
 		err = git.EditCommitMessage(headline, description)
 	case git.DontUseCommit:
-		fmt.Println("Commit message not used.")
+		log.Error("Commit message not used.")
 	}
 }
