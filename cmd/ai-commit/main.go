@@ -62,9 +62,10 @@ func main() {
 
 	// Generate commit message
 	var headline, description string
+	var aiError error
 	err = spinner.New().Action(func() {
 		ctx, cancelled := context.WithTimeout(context.Background(), time.Second*30)
-		headline, description, err = ai.GenerateCommitMessage(ctx, diff)
+		headline, description, aiError = ai.GenerateCommitMessage(ctx, diff)
 		cancelled()
 	}).Title("Generating commit message...").Run()
 
@@ -72,6 +73,11 @@ func main() {
 		log.Errorf("Error generating commit message: %v\n", err)
 		return
 	}
+
+	if aiError != nil {
+		log.Fatalf("Error generating commit message: %v\n", aiError)
+	}
+
 	// Create a form using charmbracelet/huh
 	var useCommit string
 	form := huh.NewForm(
