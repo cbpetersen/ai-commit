@@ -14,6 +14,15 @@ const (
 )
 
 func GetGitDiff() (string, error) {
+	cmd := exec.Command("git", "diff")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("error getting git diff: %w", err)
+	}
+	return string(output), nil
+}
+
+func GetGitDiffCached() (string, error) {
 	cmd := exec.Command("git", "diff", "--cached")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
