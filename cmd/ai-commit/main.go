@@ -16,14 +16,72 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+func SplitIntoPatchesFlow(aiEngine *ai.OpenAI) error {
+	commits := ""
+	for {
+		diff, err := git.GetGitDiff()
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(diff) == "" {
+			return nil
+		}
+
+		patch, err := aiEngine.CreatePatchFromDiff(context.Background(), diff, commits)
+		if err != nil {
+			return err
+		}
+
+		if patch.ContainsFaults {
+			return fmt.Errorf("AI detected faults in the patch")
+		}
+
+		if len(patch.Patch) == 0 {
+			break
+		}
+		ok := false
+		for _, hunk := range patch.Patch {
+			if hunk == "y" {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			log.Info("No more hunks to stage.")
+			return nil
+		}
+
+		if err := git.StageHunksFromPatch(patch); err != nil {
+			return err
+		}
+
+		if err := git.Commit(patch.CommitMessage); err != nil {
+			return err
+		}
+
+		if !patch.MorePatchesRemaining {
+			break
+		}
+
+		lastCommit, err := git.GetLastCommit()
+		if err != nil {
+			return err
+		}
+		commits += lastCommit + "\n"
+	}
+	return nil
+}
+
 func main() {
 	version := "0.1.0"
 	log.SetLevel(log.DebugLevel)
 	var showConfig int
+	var doPatches int
 	app := &cli.App{
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "config", Count: &showConfig, Usage: "Update the current configuration"},
 			&cli.BoolFlag{Name: "version", Aliases: []string{"v"}, Usage: "Print the version"},
+			&cli.BoolFlag{Name: "patch", Aliases: []string{"p"}, Count: &doPatches, Usage: "Create a patch file instead of committing"},
 		},
 		EnableBashCompletion: true,
 		HideHelp:             false,
@@ -47,44 +105,32 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Get the git diff
-
 	ai := ai.OpenAI{Key: config.Azure.Key, URL: config.Azure.URL}
 
 	if doPatches > 0 {
-		diff, err := git.GetGitDiff()
+		err := SplitIntoPatchesFlow(&ai)
 		if err != nil {
-			log.Errorf("Error getting git diff: %v\n", err)
-			return
-		}
-		patches, err := ai.CreatePatchFromDiff(context.Background(), diff)
-		if err != nil {
-			log.Errorf("Error generating patches: %v\n", err)
-			return
-		}
-		for _, patch := range patches {
-			fmt.Printf("Patch: %s\n", patch.Patch)
-			fmt.Printf("Commit Message: %s\n", patch.CommitMessage)
-			if err := git.CreateCommitFromPatch(patch); err != nil {
-				log.Fatalf("Error applying patch: %v\n", err)
-			}
-			if err := git.Commit(patch.CommitMessage); err != nil {
-				log.Fatalf("Error committing patch: %v\n", err)
-			}
+			log.Fatalf("Error creating patches: %v", err)
 		}
 		return
 	}
+
+	err = CommitFlow(&ai)
+	if err != nil {
+		log.Fatalf("Error in commit flow: %v", err)
+	}
+}
+
+func CommitFlow(ai *ai.OpenAI) error {
 	diff, err := git.GetGitDiffCached()
 	if err != nil {
-		log.Errorf("Error getting git diff: %v\n", err)
-		return
+		return err
 	}
 
 	if strings.TrimSpace(diff) == "" {
 		log.Error("No changes to commit.")
-		return
+		return err
 	}
-	ai := ai.OpenAI{Key: config.Azure.Key, URL: config.Azure.URL}
 
 	// Generate commit message
 	var headline, description string
@@ -96,12 +142,11 @@ func main() {
 	}).Title("Generating commit message...").Run()
 
 	if err != nil {
-		log.Errorf("Error generating commit message: %v\n", err)
-		return
+		return err
 	}
 
 	if aiError != nil {
-		log.Fatalf("Error generating commit message: %v\n", aiError)
+		return aiError
 	}
 
 	// Create a form using charmbracelet/huh
@@ -123,7 +168,7 @@ func main() {
 
 	err = form.Run()
 	if err != nil {
-		log.Fatalf("Error running form: %v", err)
+		return err
 	}
 
 	switch useCommit {
@@ -134,4 +179,7 @@ func main() {
 	case git.DontUseCommit:
 		log.Error("Commit message not used.")
 	}
+
+	return err
+
 }

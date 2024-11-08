@@ -16,12 +16,36 @@ const (
 	DontUseCommit = "dont-use"
 )
 
+func GetLastCommit() (string, error) {
+	cmd := exec.Command("git", "format-patch", "-1", "--stdout")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("error getting last commit: %w", err)
+	}
+	return string(output), nil
+}
+
 func GetGitDiff() (string, error) {
-	cmd := exec.Command("git", "diff")
+	cmd := exec.Command("git", "--no-pager", "diff")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("error getting git diff: %w", err)
 	}
+	return string(output), nil
+}
+func ResetAndStash() (string, error) {
+	cmd := exec.Command("git", "reset")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("error reseting: %w", err)
+	}
+
+	cmd = exec.Command("git", "stash")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("error stashing: %w", err)
+	}
+
 	return string(output), nil
 }
 
