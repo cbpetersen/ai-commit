@@ -88,25 +88,21 @@ func EditCommitMessage(headline, description string) error {
 	return nil
 }
 
-func CreateCommitFromPatch(msg ai.Patch) error {
-	f, err := os.Create("patch.diff")
-	defer f.Close()
-	// defer os.Remove("patch.diff")
-	if err != nil {
-		return fmt.Errorf("error creating patch file: %w", err)
+func StageHunksFromPatch(msg *ai.Patch) error {
+	str := "EOF" + "\n"
+	for i := 0; i < len(msg.Patch); i++ {
+		str += string(msg.Patch[i])
+		str += "\n"
 	}
-	log.Debug("patch file created")
-	log.Debug(msg.Patch)
-	if _, err := f.WriteString(msg.Patch); err != nil {
-		return fmt.Errorf("error writing patch file: %w", err)
-	}
-	cmd := exec.Command("git", "apply", "--verbose", "patch.diff")
-	output, err := cmd.CombinedOutput()
+	str += "EOF"
 
+	cmd := exec.Command("bash", "-c", fmt.Sprintf("git add --patch << %s", str))
+
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("error applying patch: %w\n%s", err, output)
+		return err
 	}
-	log.Infof("patch applied:\n%s", output)
+	log.Debug(string(out))
 
 	return nil
 }
