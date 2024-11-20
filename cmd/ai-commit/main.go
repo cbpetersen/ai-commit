@@ -78,14 +78,16 @@ func SplitIntoPatchesFlow(aiEngine *ai.OpenAI, dryRun bool) error {
 
 func main() {
 	version := "0.1.0"
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.InfoLevel)
 	var showConfig int
 	var doPatches int
+	var dryRun int
 	app := &cli.App{
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "config", Count: &showConfig, Usage: "Update the current configuration"},
 			&cli.BoolFlag{Name: "version", Aliases: []string{"v"}, Usage: "Print the version"},
 			&cli.BoolFlag{Name: "patch", Aliases: []string{"p"}, Count: &doPatches, Usage: "Create a patch file instead of committing"},
+			&cli.BoolFlag{Name: "dry", Aliases: []string{"d"}, Count: &dryRun, Usage: "Only stage instead of committing"},
 		},
 		EnableBashCompletion: true,
 		HideHelp:             false,

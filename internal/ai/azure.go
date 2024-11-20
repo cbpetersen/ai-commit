@@ -104,7 +104,7 @@ func (ai *OpenAI) CreatePatchFromDiff(ctx context.Context, diff string, commits 
 		fmt.Printf("ChatCompletion error: %v\n", err)
 		return nil, err
 	}
-	log.Debugf("resp: %v", resp)
+	// log.Debugf("resp: %v", resp)
 	var patch GPTPatch
 	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &patch)
 	if err != nil {
