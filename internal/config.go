@@ -26,7 +26,7 @@ func GetConfig(showConfig bool) (*Config, error) {
 		return nil, err
 	}
 	configPath := filepath.Join(homeDir, ".config", "ai-commit", "ai-commit.toml")
-	log.Debugf("Config path: %s", configPath)
+	// log.Debugf("Config path: %s", configPath)
 	config := Config{}
 	if _, err := os.Stat(configPath); os.IsNotExist(err) || showConfig {
 		configForm := huh.NewForm(

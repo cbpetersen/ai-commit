@@ -46,7 +46,7 @@ func (ai *OpenAI) CreatePatchFromDiff(ctx context.Context, diff string, commits 
 		fmt.Printf("Error marshalling schema: %v\n", err)
 		return nil, err
 	}
-	log.Debug(diff)
+	// log.Debug(diff)
 	log.Info("Querying AI for patch")
 
 	numHunks := 0

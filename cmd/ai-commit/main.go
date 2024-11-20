@@ -16,7 +16,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func SplitIntoPatchesFlow(aiEngine *ai.OpenAI) error {
+func SplitIntoPatchesFlow(aiEngine *ai.OpenAI, dryRun bool) error {
 	commits := ""
 	for {
 		diff, err := git.GetGitDiff()
@@ -53,6 +53,10 @@ func SplitIntoPatchesFlow(aiEngine *ai.OpenAI) error {
 
 		if err := git.StageHunksFromPatch(patch); err != nil {
 			return err
+		}
+
+		if dryRun {
+			break
 		}
 
 		if err := git.Commit(patch.CommitMessage); err != nil {
@@ -108,7 +112,7 @@ func main() {
 	ai := ai.OpenAI{Key: config.Azure.Key, URL: config.Azure.URL}
 
 	if doPatches > 0 {
-		err := SplitIntoPatchesFlow(&ai)
+		err := SplitIntoPatchesFlow(&ai, dryRun > 0)
 		if err != nil {
 			log.Fatalf("Error creating patches: %v", err)
 		}
