@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/huh v0.6.0
 	github.com/charmbracelet/huh/spinner v0.0.0-20241216182847-438e4f741435
 	github.com/charmbracelet/log v0.4.0
-	github.com/sashabaranov/go-openai v1.29.2
+	github.com/sashabaranov/go-openai v1.36.1
 	github.com/urfave/cli/v2 v2.27.5
 )
 
